@@ -1,0 +1,99 @@
+services:
+  nginx:
+    image: nginx:alpine
+    container_name: rinha-nginx
+    volumes:
+      - ./Nginx/nginx.conf:/etc/nginx/nginx.conf
+    depends_on:
+      - api1
+      - api2
+    ports:
+      - "9999:9999"
+    networks:
+      - backend
+    deploy:
+      resources:
+        limits:
+          cpus: "0.2"
+          memory: "20MB"
+    command: ["nginx", "-g", "daemon off;"]
+
+  api1:
+    image: g4brielv/rinha-backend-2025:v6
+    #build: .
+    container_name: rinha-api-1
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      #- JAVA_TOOL_OPTIONS
+    depends_on:
+      postgresql-rinha:
+        condition: service_healthy
+    env_file:
+      - .env
+    networks:
+      - backend
+      - payment-processor
+    ports:
+      - "8081:8080"
+    #    healthcheck:
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: "105MB"
+
+  api2:
+    image: g4brielv/rinha-backend-2025:v6
+    #build: .
+    container_name: rinha-api-2
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      #- JAVA_TOOL_OPTIONS
+    depends_on:
+      postgresql-rinha:
+        condition: service_healthy
+    env_file:
+      - .env
+    networks:
+      - backend
+      - payment-processor
+    ports:
+      - "8082:8080"
+    #    healthcheck:
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: "105MB"
+
+  postgresql-rinha:
+    image: postgres:16
+    container_name: rinha-postgresql
+    restart: always
+    env_file:
+      - .env
+    ports:
+      - "5433:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - backend
+    deploy:
+      resources:
+        limits:
+          cpus: "0.3"
+          memory: "120MB"
+
+volumes:
+  pgdata:
+
+networks:
+  backend:
+    driver: bridge
+  payment-processor:
+    external: true

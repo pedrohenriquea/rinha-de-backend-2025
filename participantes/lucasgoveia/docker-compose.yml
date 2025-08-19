@@ -1,0 +1,144 @@
+x-default-user: &default-user "1000:1000"
+x-build-args: &build-args
+  APP_UID: "1000"
+  APP_GID: "1000"
+x-service-templates:
+  gateway: &gateway
+    image: lucasgoveia/rinha-2025-gateway:a282e059dd75
+    user: *default-user
+    restart: always
+    depends_on:
+      - postgres
+      - worker
+    networks:
+      - backend
+      - payment-processor
+    ulimits:
+      nofile:
+        soft: 16384
+        hard: 16384
+    deploy:
+      resources:
+        limits:
+          cpus: '0.3'
+          memory: '30M'
+    volumes:
+      - pg_socket:/var/run/postgresql
+      - tmp_sockets:/tmp
+
+services:
+  loadbalancer:
+    image: haproxy:alpine
+    ports:
+      - "9999:9999"
+    depends_on:
+      - gateway1
+      - gateway2
+    networks:
+      - backend
+    restart: always
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+    deploy:
+      resources:
+        limits:
+          cpus: '0.35'
+          memory: '50M'
+    volumes:
+      - tmp_sockets:/tmp
+      - ./haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
+
+  gateway1:
+    <<: *gateway
+    container_name: gateway1
+    hostname: gateway1
+    environment:
+      - GATEWAY_LISTEN_SOCKET=/tmp/gateway1.sock
+      - POSTGRES_URL=postgres://postgres:password@/rinha2025?host=/var/run/postgresql
+      - GATEWAY_PUBLISH_SOCKET=/tmp/payments-stream.sock
+
+  gateway2:
+    <<: *gateway
+    container_name: gateway2
+    hostname: gateway2
+    environment:
+      - GATEWAY_LISTEN_SOCKET=/tmp/gateway2.sock
+      - POSTGRES_URL=postgres://postgres:password@/rinha2025?host=/var/run/postgresql
+      - GATEWAY_PUBLISH_SOCKET=/tmp/payments-stream.sock
+
+  worker:
+    image: lucasgoveia/rinha-2025-worker:a282e059dd75
+    user: *default-user
+    restart: always
+    depends_on:
+      - postgres
+    networks:
+      - backend
+      - payment-processor
+    ulimits:
+      nofile:
+        soft: 16384
+        hard: 16384
+    deploy:
+      resources:
+        limits:
+          cpus: '0.4'
+          memory: '60M'
+    volumes:
+      - pg_socket:/var/run/postgresql
+      - tmp_sockets:/tmp
+    container_name: worker
+    hostname: worker
+    environment:
+      - LISTEN_PATH=/tmp/payments-stream.sock
+      - NUM_WORKERS=64
+      - POSTGRES_URL=postgres://postgres:password@/rinha2025?host=/var/run/postgresql
+      - DEFAULT_PROCESSOR_URL=http://payment-processor-default:8080
+      - FALLBACK_PROCESSOR_URL=http://payment-processor-fallback:8080
+
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=rinha2025
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+      - pg_socket:/var/run/postgresql
+    networks:
+      - backend
+    restart: always
+    deploy:
+      resources:
+        limits:
+          cpus: '0.15'
+          memory: '128M'
+
+volumes:
+  postgres_data:
+    driver: local
+    driver_opts:
+      type: tmpfs
+      device: tmpfs
+      o: uid=70,gid=70
+  pg_socket:
+    driver: local
+    driver_opts:
+      type: tmpfs
+      device: tmpfs
+      o: uid=1000,gid=1000
+  tmp_sockets:
+    driver: local
+    driver_opts:
+      type: tmpfs
+      device: tmpfs
+      o: uid=1000,gid=1000
+
+networks:
+  backend:
+    driver: bridge
+  payment-processor:
+    external: true

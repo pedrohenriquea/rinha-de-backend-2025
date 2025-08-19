@@ -1,0 +1,1 @@
+Essa submissão tenta utilizar duas instâncias de API pra obter latência mínima, e uma instância de worker para processar os payments, a comunicação entre elas ocorre via sockets tcp, é provável que o python não aguente com apenas 0.4 de CPU.

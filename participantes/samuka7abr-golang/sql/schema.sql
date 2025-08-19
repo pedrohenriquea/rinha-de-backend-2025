@@ -1,0 +1,4 @@
+CREATE TABLE IF NOT EXISTS payments (
+  ts BIGINT NOT NULL,
+  amount BIGINT NOT NULL
+);

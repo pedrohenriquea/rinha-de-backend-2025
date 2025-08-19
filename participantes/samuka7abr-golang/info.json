@@ -1,0 +1,10 @@
+{
+  "name": "Samuel Abrão",
+  "social": ["https://github.com/samuka7abr", "https://x.com/samuca_tech", "https://www.linkedin.com/in/samuel-abr%C3%A3o-0655a12ba/"],
+  "source-code-repo": "https://github.com/samuka7abr/rinha-backend-2025",
+  "langs": ["go"],
+  "storages": ["postgresql", "redis"],
+  "messaging": [],
+  "load-balancers": ["nginx"],
+  "other-technologies": ["docker", "docker-compose"]
+} 

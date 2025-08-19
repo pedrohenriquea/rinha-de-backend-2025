@@ -1,0 +1,113 @@
+services:
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - backend
+    deploy:
+      resources:
+        limits:
+          cpus: '0.15'
+          memory: 30MB
+
+  app-native-1:
+    image: docker.io/maxsonferovante/api-payment-processor:latest
+    pull_policy: always
+    environment:
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_TIMEOUT: 5000ms
+      REDIS_QUEUE_PAYMENTS_MAIN: rinha-payments-main-queue
+      # Flags de JVM otimizadas para recursos limitados
+      JAVA_OPTS: "-Xmx75m -Xms50m -XX:+UseG1GC -XX:MaxGCPauseMillis=100 -XX:+UseStringDeduplication -XX:G1HeapRegionSize=1m -XX:MaxMetaspaceSize=20m"
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - backend
+      - payment-processor
+    deploy:
+      resources:
+        limits:
+          cpus: '0.35'
+          memory: 100MB
+
+  app-native-2:
+    image: docker.io/maxsonferovante/api-payment-processor:latest
+    pull_policy: always
+    environment:
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_TIMEOUT: 5000ms
+      REDIS_QUEUE_PAYMENTS_MAIN: rinha-payments-main-queue
+      # Flags de JVM otimizadas para recursos limitados
+      JAVA_OPTS: "-Xmx75m -Xms50m -XX:+UseG1GC -XX:MaxGCPauseMillis=100 -XX:+UseStringDeduplication -XX:G1HeapRegionSize=1m -XX:MaxMetaspaceSize=20m"
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - backend
+      - payment-processor
+    deploy:
+      resources:
+        limits:
+          cpus: '0.35'
+          memory: 100MB
+
+  # Processador assíncrono de pagamentos - consome mensagens do Redis
+  async-worker:
+    image: docker.io/maxsonferovante/async-payment-processor:latest
+    pull_policy: always
+    environment:
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_TIMEOUT: 5000ms
+      REDIS_QUEUE_PAYMENTS_MAIN: rinha-payments-main-queue
+      PAYMENT_PROCESSOR_DEFAULT_URL: http://payment-processor-default:8080
+      PAYMENT_PROCESSOR_FALLBACK_URL: http://payment-processor-fallback:8080
+      WORKER_MAX_CONCURRENT_PAYMENTS: 80
+      WORKER_BATCH_SIZE: 100
+      WORKER_EXECUTION_DELAY: 100
+      # Flags de JVM otimizadas para recursos limitados
+      JAVA_OPTS: "-Xmx60m -Xms40m -XX:+UseG1GC -XX:MaxGCPauseMillis=100 -XX:+UseStringDeduplication -XX:G1HeapRegionSize=1m -XX:MaxMetaspaceSize=15m"
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - backend
+      - payment-processor
+    deploy:
+      resources:
+        limits:
+          cpus: '0.3'
+          memory: 80MB
+
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "9999:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - app-native-1
+      - app-native-2
+    networks:
+      - backend
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 40MB
+
+networks:
+  backend:
+    driver: bridge
+    name: backend
+  payment-processor:
+    external: true

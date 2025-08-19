@@ -1,0 +1,87 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: admin
+      POSTGRES_DB: rinha
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./sql/schema.sql:/docker-entrypoint-initdb.d/0-schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin -d rinha"]
+      interval: 2s
+      timeout: 1s
+      retries: 30
+    networks: [rinha-net]
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server","--appendonly","no","--maxmemory-policy","allkeys-lru"]
+    healthcheck:
+      test: ["CMD","redis-cli","ping"]
+      interval: 2s
+      timeout: 1s
+      retries: 30
+    sysctls:
+      net.core.somaxconn: 65535
+    networks: [rinha-net]
+
+  app-1:
+    image: samuka7abrr/my-rinha-backend:latest
+    environment:
+      APP_PORT: "8080"
+      REDIS_ADDR: "redis:6379"
+      POSTGRES_DSN: "postgres://admin:admin@postgres:5432/rinha?sslmode=disable"
+      WINDOW_SECONDS: "600"     
+      QUEUE_SIZE: "200000"      
+      BATCH_SIZE: "2000"        
+      BATCH_MAX_MS: "50"        
+      REDIS_TTL_SEC: "180"      
+      GOGC: "200"
+      GOMEMLIMIT: "512MiB"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks: [rinha-net]
+
+  app-2:
+    image: samuka7abrr/my-rinha-backend:latest
+    environment:
+      APP_PORT: "8080"
+      REDIS_ADDR: "redis:6379"
+      POSTGRES_DSN: "postgres://admin:admin@postgres:5432/rinha?sslmode=disable"
+      WINDOW_SECONDS: "600"
+      QUEUE_SIZE: "200000"
+      BATCH_SIZE: "2000"
+      BATCH_MAX_MS: "50"
+      REDIS_TTL_SEC: "180"
+      GOGC: "200"
+      GOMEMLIMIT: "512MiB"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks: [rinha-net]
+
+  nginx:
+    image: nginx:1.25-alpine
+    ports:
+      - "9999:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      app-1:
+        condition: service_started
+      app-2:
+        condition: service_started
+    networks: [rinha-net]
+
+volumes:
+  pgdata:
+
+networks:
+  rinha-net:

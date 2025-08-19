@@ -1,0 +1,56 @@
+x-service-templates:
+  api: &api
+    image: gabrieleiro/rinha-de-backend-2025-api:13.0
+    networks:
+      - rinha-de-backend-2025
+      - payment-processor
+    deploy:
+      resources:
+        limits:
+          cpus: "0.6"
+          memory: "80MB"
+    volumes:
+      - /tmp:/tmp
+
+services:
+  api-1: 
+    <<: *api
+    hostname: api-1
+    environment:
+      DEFAULT_PROCESSOR_URL: "http://payment-processor-default:8080"
+      FALLBACK_PROCESSOR_URL: "http://payment-processor-fallback:8080"
+      OTHER_BACKEND_URI: "/tmp/api_2.sock"
+      ADDRESS: "/tmp/api_1.sock"
+
+  api-2:
+    <<: *api
+    hostname: api-2
+    environment:
+      DEFAULT_PROCESSOR_URL: "http://payment-processor-default:8080"
+      FALLBACK_PROCESSOR_URL: "http://payment-processor-fallback:8080"
+      OTHER_BACKEND_URI: "/tmp/api_1.sock"
+      ADDRESS: "/tmp/api_2.sock"
+
+  load-balancer:
+    image: gabrieleiro/rinha-de-backend-2025-load-balancer:haproxy-2.0
+    networks:
+      - rinha-de-backend-2025
+    deploy:
+      resources:
+        limits:
+          cpus: "0.3"
+          memory: "50MB"
+    ports:
+      - "9999:9999"
+    volumes:
+      - /tmp:/tmp
+    depends_on:
+      - api-1
+      - api-2
+
+networks:
+  rinha-de-backend-2025:
+    name: rinha-de-backend-2025
+    driver: bridge
+  payment-processor:
+    external: true
