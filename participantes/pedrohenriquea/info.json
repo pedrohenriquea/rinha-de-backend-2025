@@ -1,0 +1,13 @@
+{
+  "name": "Pedro Amaral",
+  "social": [
+    "https://www.linkedin.com/in/pedrohenriquea",
+    "https://github.com/pedrohenriquea/"
+  ],
+  "source-code-repo": "https://github.com/pedrohenriquea/rinha-2025",
+  "langs": ["java"],
+  "storages": ["postgres"],
+  "messaging": [""],
+  "load-balancers": ["nginx"],
+  "other-technologies": ["micronaut", "graalvm"]
+}

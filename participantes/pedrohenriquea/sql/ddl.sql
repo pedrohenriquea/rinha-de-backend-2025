@@ -1,0 +1,11 @@
+DROP TABLE IF EXISTS payments;
+
+CREATE TABLE payments (
+    id SERIAL PRIMARY KEY,
+    correlation_id UUID NOT NULL UNIQUE,
+    amount NUMERIC(10, 2) NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    fallback bool default false,
+    status VARCHAR(20) NOT NULL
+);
